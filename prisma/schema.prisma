@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model EFMigrationsHistory {
+  MigrationId    String @id(map: "PK___EFMigrationsHistory") @db.NVarChar(150)
+  ProductVersion String @db.NVarChar(32)
+
+  @@map("__EFMigrationsHistory")
+}
+
+model Goals {
+  Id              Int               @id(map: "PK_Goals") @default(autoincrement())
+  Description     String            @db.NVarChar(Max)
+  StartDate       DateTime
+  EndDate         DateTime
+  LastUpdated     DateTime
+  CreatedTime     DateTime
+  IsActivated     Boolean
+  IsQuitting      Boolean
+  GoalValue       Float
+  ProfileId       String?           @db.NVarChar(450)
+  Unit            String            @default("N'", map: "DF__Goals__Unit__2739D489") @db.NVarChar(Max)
+  Userprofiles    Userprofiles?     @relation(fields: [ProfileId], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_Goals_Userprofiles_ProfileId")
+  ProgressRecords ProgressRecords[]
+
+  @@index([ProfileId], map: "IX_Goals_ProfileId")
+}
+
+model ProgressRecords {
+  Id             Int      @id(map: "PK_ProgressRecords") @default(autoincrement())
+  CreatedTime    DateTime
+  Notes          String?  @db.NVarChar(Max)
+  CompletedValue Float
+  GoalId         Int
+  Goals          Goals    @relation(fields: [GoalId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "FK_ProgressRecords_Goals_GoalId")
+
+  @@index([GoalId], map: "IX_ProgressRecords_GoalId")
+}
+
+model Userprofiles {
+  Id           String  @id(map: "PK_Userprofiles") @db.NVarChar(450)
+  Sex          String? @db.NVarChar(Max)
+  Province     String? @db.NVarChar(Max)
+  City         String? @db.NVarChar(Max)
+  PostalCode   String? @db.NVarChar(Max)
+  Age          Int?
+  NeedReport   Boolean @default(dbgenerated("CONVERT([bit],(0))"), map: "DF__Userprofi__needR__6E01572D")
+  EmailAddress String  @default("N'", map: "DF__Userprofi__Email__14270015") @db.NVarChar(Max)
+  Goals        Goals[]
+}
