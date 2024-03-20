@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { startOfToday, startOfYesterday } from "date-fns";
 import { client } from "../cosmos/connect";
 import { PrismaClient } from '@prisma/client';
-import { Goal, ProgressRecord, ReportData } from "../models/report-data-prep.interface";
+import { Bucket, Goal, ProgressRecord, ReportData, TrimmedUserProfile } from "../models/report-data-prep.interface";
 const prisma = new PrismaClient();
 const database = client.database('HabitFYDB');
 const container = database.container('UserReportCache');
@@ -16,6 +17,9 @@ class ReportDataPrepService {
         const activatedGoals = await prisma.goals.findMany({
             where:{
                 IsActivated:true,
+                Userprofiles:{
+                    NeedReport:true,
+                }
             },
             include:{
                 ProgressRecords: {
@@ -44,18 +48,29 @@ class ReportDataPrepService {
                 userGoalsMap.set(ele.ProfileId,[ele]);
             }
         })
-        console.log(userGoalsMap);
-
-        // Step 3 
+        // Step 3 turning Goals into Report Data
+        // Key is still user id 
+        // value is report data
         const result = await this.prepareActivityStatistic(userGoalsMap)
+        
+        // Step 4 calculating the user is doing better than how much percentage of users in 
+        // that postal code
+        const finalResult = await this.calculatingBetterThanPercent(result);
+
+        // Step 5 upsert the user status by 
+        for (const property in finalResult){
+            try{
+                await container.items.upsert({id:property,data:finalResult[property]});
+            }
+            catch(err){
+                // console.log(err)
+            }
+        }
+    
         return {
           success: true,
-          data:result
+          data:finalResult
         };
-    }
-    static async persistReportData(){
-        console.log(container)
-        console.log(`persist now`)
     }
 
     // Connect to this after step 3
@@ -97,6 +112,72 @@ class ReportDataPrepService {
             resultJson[key] = temp;
         })
         return resultJson;
+    }
+
+    // userReportJson is more like a map but it is a JSON object.
+    // Key is the userid, values are the Report Data
+    private static async calculatingBetterThanPercent(userReportJson:any){
+        // need to make a postal code is the key
+        const userWithPostalCode = await prisma.userprofiles.findMany({
+          where: { NeedReport: true  },
+          select: {Id:true,PostalCode:true},
+        });
+        // first string is postal code
+        // second string arr is the user name
+        const userByPostalCodemap = new Map<string,Bucket[]>();
+        userWithPostalCode.map((ele:TrimmedUserProfile)=>{
+            let KPI:number = 0;
+            if(userReportJson[ele.Id]){
+                KPI = userReportJson[ele.Id].actualFinishedGoalCount/userReportJson[ele.Id].planedToFinishGoalCount
+            }
+            const foundBucket = userByPostalCodemap.get(ele.PostalCode.replace(' ',''));
+            if (foundBucket){
+                foundBucket.push({Id:ele.Id,goalFinishedRate:KPI});
+            }
+            else{
+                userByPostalCodemap.set(
+                    ele.PostalCode.replace(' ',''),
+                    [{
+                        Id:ele.Id,
+                        goalFinishedRate:KPI,
+                    }]
+                ) ;
+            }
+        })
+        // Looping through bucket, each element of the array. 
+        // Use compare between each elements and decide who is better
+        // console.log(userByPostalCodemap)
+        userByPostalCodemap.forEach((bucketArr)=>{
+            bucketArr.map((ele:Bucket)=>{
+                const foundVal = userReportJson[ele.Id]
+                if(foundVal!==undefined){
+                    foundVal.totalUserCountInPostalCode = bucketArr.length;
+                    let sameCount = 0;
+                    let beatCount = 0;
+                    // If one postal bucket is having more than just one user 
+                    if(bucketArr.length > 1){
+                        bucketArr.forEach((innerBucket:Bucket)=>{
+                            if(ele.Id != innerBucket.Id){
+                                if(ele.goalFinishedRate > innerBucket.goalFinishedRate) {
+                                    ++beatCount;
+                                }
+                                else if(ele.goalFinishedRate == innerBucket.goalFinishedRate){
+                                    ++sameCount;
+                                }
+                            }
+                        })
+                        foundVal.beatingCompetitorPercentage = bucketArr.length-1 > 0? beatCount / (bucketArr.length-1) : 0;
+                        foundVal.samePerformanceUsersCount = sameCount;
+                    }
+                    else{
+                        foundVal.beatingCompetitorPercentage = foundVal.actualFinishedGoalCount > 0 ? 1:0;
+                        foundVal.samePerformanceUsersCount = -1; // A flag val for front end, you can just show too less people to compare. 
+                        foundVal.totalUserCountInPostalCode = -1; // A flag val for front end, you can just show too less people to compare. 
+                    }
+                }
+            })
+        })
+        return userReportJson;
     }
 }
 

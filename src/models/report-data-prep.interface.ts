@@ -1,8 +1,22 @@
-export interface ReportData{
-    planedToFinishGoalCount:number,
-    actualFinishedGoalCount:number,
-    reachedGoalStreak:number,
-    beatingCompetitorPercentage:number
+export interface Bucket{
+    Id:string;
+    goalFinishedRate:number;
+}
+
+
+export interface TrimmedUserProfile{
+    Id:string;
+    PostalCode:string;
+}
+
+
+export interface ReportData {
+  planedToFinishGoalCount: number;
+  actualFinishedGoalCount: number;
+  reachedGoalStreak: number;
+  beatingCompetitorPercentage: number;
+  samePerformanceUsersCount: number;
+  totalUserCountInPostalCode:number;
 }
 
 export interface Goal {

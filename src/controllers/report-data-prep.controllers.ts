@@ -7,6 +7,7 @@ class ReportDataPrepController{
           const exampleData = await ReportDataPrepService.prepReportData();
           res.json(exampleData);
         } catch (err) {
+          console.log(err)
           res.status(500).json(err);
         }
     }
