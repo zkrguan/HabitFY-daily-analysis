@@ -5,7 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import { Bucket, Goal, ProgressRecord, ReportData, TrimmedUserProfile, UpdateCosmosError } from "../models/report-data-prep.interface";
 const prisma = new PrismaClient();
 const database = client.database('HabitFYDB');
-const container = database.container('UserReportCache');
+const container = database.container('UserDailyReport');
 
 class ReportDataPrepService {
     static async prepReportData(){
@@ -62,7 +62,7 @@ class ReportDataPrepService {
         // Step 5 upsert the user status by 
         for (const property in finalResult){
             try{
-                await container.items.upsert({id:property,data:finalResult[property]});
+                await container.items.upsert({id:property,data:finalResult[property],postalCode:finalResult[property].postalCode});
                 ++successCnt;
             }
             catch(err){
@@ -153,10 +153,11 @@ class ReportDataPrepService {
         // Looping through bucket, each element of the array. 
         // Use compare between each elements and decide who is better
         // console.log(userByPostalCodemap)
-        userByPostalCodemap.forEach((bucketArr)=>{
+        userByPostalCodemap.forEach((bucketArr,postalCode)=>{
             bucketArr.map((ele:Bucket)=>{
                 const foundVal = userReportJson[ele.Id]
                 if(foundVal!==undefined){
+                    foundVal.postalCode = postalCode;
                     foundVal.totalUserCountInPostalCode = bucketArr.length;
                     let sameCount = 0;
                     let beatCount = 0;
