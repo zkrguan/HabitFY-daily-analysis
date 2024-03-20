@@ -9,6 +9,11 @@ export interface TrimmedUserProfile{
     PostalCode:string;
 }
 
+export interface UpdateCosmosError{
+    id:string;
+    errorMessage:string;
+}
+
 
 export interface ReportData {
   planedToFinishGoalCount: number;

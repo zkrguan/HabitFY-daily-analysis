@@ -2,13 +2,15 @@
 import { startOfToday, startOfYesterday } from "date-fns";
 import { client } from "../cosmos/connect";
 import { PrismaClient } from '@prisma/client';
-import { Bucket, Goal, ProgressRecord, ReportData, TrimmedUserProfile } from "../models/report-data-prep.interface";
+import { Bucket, Goal, ProgressRecord, ReportData, TrimmedUserProfile, UpdateCosmosError } from "../models/report-data-prep.interface";
 const prisma = new PrismaClient();
 const database = client.database('HabitFYDB');
 const container = database.container('UserReportCache');
 
 class ReportDataPrepService {
     static async prepReportData(){
+        let successCnt:number = 0;
+        const errorArr:UpdateCosmosError[] = [] as UpdateCosmosError[];
         // Parse yesterday's and today's dates in UTC format
         const yesterdayUTC = startOfYesterday(); // Get yesterday's date at 12:00 AM UTC
         const todayUTC = startOfToday(); // Get today's date at 12:00 AM UTC
@@ -61,15 +63,19 @@ class ReportDataPrepService {
         for (const property in finalResult){
             try{
                 await container.items.upsert({id:property,data:finalResult[property]});
+                ++successCnt;
             }
             catch(err){
-                // console.log(err)
+                errorArr.push({
+                    id:property,
+                    errorMessage:err
+                })
             }
         }
     
         return {
-          success: true,
-          data:finalResult
+          successCnt: successCnt,
+          errors:errorArr
         };
     }
 
