@@ -115,6 +115,7 @@ class ReportDataPrepService {
             // Meaning user actually set goals for target//
             if(value.length!==0){
               // Track how many goals user finished
+              // This is correct because I put this outside the inner loop. 
               let finishedCount = 0;
               temp.planedToFinishGoalCount = value.length;
               value.forEach((goal: Goal) => {
@@ -128,8 +129,8 @@ class ReportDataPrepService {
                 // A boring language
                 // Somehow I made it fun
                 finishedCount += goal.IsQuitting
-                  ? Number(goal.GoalValue > actualValue)
-                  : Number(goal.GoalValue < actualValue);
+                  ? Number(goal.GoalValue >= actualValue)
+                  : Number(goal.GoalValue <= actualValue);
               });
               temp.actualFinishedGoalCount = finishedCount;
               temp.reachedGoalStreak = Number(
