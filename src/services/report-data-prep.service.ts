@@ -55,12 +55,33 @@ class ReportDataPrepService {
         // value is report data
         const result = await this.prepareActivityStatistic(userGoalsMap)
         
-        // Step 4 calculating the user is doing better than how much percentage of users in 
+        // Step 4.1 calculating the user is doing better than how much percentage of users in 
         // that postal code
         const finalResult = await this.calculatingBetterThanPercent(result);
 
+        // Step 4.2 calculating the on streak day, at least get the map
+
+        const {resources} = await container.items.query("SELECT * FROM c where c.data.reachedGoalStreak > 0").fetchAll();
+        const streakRecordByUserIdMap = new Map<string,number>();
+        resources.map((ele)=>{
+            streakRecordByUserIdMap.set(ele.id,ele.data.reachedGoalStreak)
+        })
         // Step 5 upsert the user status by 
         for (const property in finalResult){
+            const streak = streakRecordByUserIdMap.get(property)
+
+            if(streak){
+                finalResult[property].reachedGoalStreak =
+                  finalResult[property].reachedGoalStreak === 0
+                    ? 0
+                    : streak + 1;
+            }
+            else{
+                finalResult[property].reachedGoalStreak =
+                  finalResult[property].reachedGoalStreak === 0
+                    ? 0
+                    : 1; // Just reached goal today streak Plus 1
+            }
             try{
                 await container.items.upsert({id:property,data:finalResult[property],postalCode:finalResult[property].postalCode});
                 ++successCnt;
@@ -117,6 +138,7 @@ class ReportDataPrepService {
             }
             resultJson[key] = temp;
         })
+
         return resultJson;
     }
 
@@ -178,6 +200,8 @@ class ReportDataPrepService {
                     }
                     else{
                         foundVal.beatingCompetitorPercentage = foundVal.actualFinishedGoalCount > 0 ? 1:0;
+                        // Don't just tell them only you are the active user. 
+                        // Tell them we have too less user in that area.
                         foundVal.samePerformanceUsersCount = -1; // A flag val for front end, you can just show too less people to compare. 
                         foundVal.totalUserCountInPostalCode = -1; // A flag val for front end, you can just show too less people to compare. 
                     }
