@@ -1,23 +1,25 @@
 import cron from 'node-cron';
 import ReportDataPrepService from '../services/report-data-prep.service';
 
+import { logger } from '../configs/winston.config'
+
 cron.schedule('1 0 * * *', () => {
   ReportDataPrepService.prepReportData()
     .then((data) => {
-      console.log(`daily update was a success!\n`);
-      console.log(`${data.successCnt} records were updated.\n`);
-      console.log(`${data.errors.length} errors found after updates.\n`);
+      logger.info(`daily update was a success!\n`);
+      logger.info(`${data.successCnt} records were updated.\n`);
+      logger.info(`${data.errors.length} errors found after updates.\n`);
       data.errors.map((ele) => {
-        console.log(`user Id is ${ele.id}\n`);
-        console.log(ele.errorMessage +'\n');
+        logger.info(`user Id is ${ele.id}\n`);
+        logger.info(ele.errorMessage +'\n');
       });
     })
     .catch((error) => {
-      console.error(`The daily user stat was interrupted.`);
-      console.error(error);
+      logger.error(`The daily user stat was interrupted.`);
+      logger.error(error);
     });
 });
 
 export const wireUpScheduledTask = () => {
-  console.log(`The scheduled task has been wired up.`);
+  logger.info(`The scheduled task has been wired up.`);
 };
